@@ -1,0 +1,27 @@
+version: 0.2
+env:
+  variables:
+    ECR_REPO_NAME: html-docs-hello-world
+phases:
+  pre_build:
+    commands:
+      # ECR MAIN URI
+      - ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+      - ECR_IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${ECR_REPO_NAME}:${CODEBUILD_RESOLVED_SOURCE_VERSION}"
+      # ECR PUBLIC GALLERY LOGIN
+      - aws ecr-public get-login-password --region us-east-1  | docker login -u AWS --password-stdin public.ecr.aws
+      # ECR LOGIN 
+      - aws ecr get-login-password --region ${AWS_DEFAULT_REGION}  | docker login -u AWS --password-stdin ${ECR_REGISTRY}
+  build:
+    commands:
+      - docker build -t html-docs-hello-world . 
+  post_build:
+    commands:
+      - docker tag html-docs-hello-world ${ECR_IMAGE_URI}
+      - docker push ${ECR_IMAGE_URI}
+
+      # Create New Task Revision
+      - printf '[{"name":"container-angular-app", "imageUri":"%s"}]' ${ECR_IMAGE_URI} > taskdefinition.json
+artifacts:
+  files:
+    - taskdefinition.json
